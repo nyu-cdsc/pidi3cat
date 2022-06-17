@@ -1,0 +1,1442 @@
+---
+title: "The role of category salience in pragmatic inferences for generics"
+author: "Kelsey Moty"
+output: html_document
+---
+
+## Getting set up
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Importing libraries
+You will need to have these packages installed in order for this code to run correctly. 
+```{r packages}
+library(here)
+library(tidyverse)
+library(lubridate)
+library(geepack)
+library(e1071)
+library(emmeans)
+```
+
+### Importing the data
+#### Study 1
+Child data 
+```{r import_data_kids3}
+dataset <- read_csv(here::here("02_experiment", "data", "pidi3cat_child.csv"))
+```
+
+Data from Moty and Rhodes (2021) Study 1 (for comparison of inferences from two versus three categories)
+```{r import_data_kids2}
+pidi1_data <- read_csv(here::here("02_experiment", "data", "motyrhodes2021_expt1_allparticipants.csv"))
+```
+
+Adults 
+```{r}
+data_adult <- read_csv(here::here("02_experiment", "data", "pidi3cat_study1_adults.csv"))
+```
+
+#### Study 2
+```{r}
+data_adult <- read_csv(here::here("02_experiment", "data", "pidi3cat_study2_adults.csv"))
+```
+
+#### Study 3
+```{r}
+data_adult <- read_csv(here::here("02_experiment", "data", "pidi3cat_study3_adults.csv"))
+```
+
+
+## Study 1
+
+### Property Extension
+First, we examined the rate at which participants extended the target property to
+individuals to members of the mentioned versus unmentioned kinds. 
+
+#### Adults and children
+```{r}
+expt1_test_results <- geeglm(
+  response ~ condition + age_year + group + condition*age_year + 
+    condition*group + age_year*group + condition*age_year*group, 
+  data = combined_data, 
+  family = binomial(logit), 
+  id = id, 
+  corstr = "exchangeable")
+summary(expt1_test_results)
+
+expt1_test_anova <- anova(expt1_test_results)
+expt1_test_anova
+```
+
+##### Marginal means 
+```{r}
+means1 <- as.data.frame(emmeans::emmeans(expt1_test_results, ~ group)) %>%
+  mutate(emmean = (exp(emmean)/(1+exp(emmean))),
+         asymp.LCL = (exp(asymp.LCL)/(1+exp(asymp.LCL))), 
+         asymp.UCL = (exp(asymp.UCL)/(1+exp(asymp.UCL))))
+
+
+means2 <- as.data.frame(emmeans::emmeans(expt1_test_results, ~ group | condition)) %>%
+  mutate(emmean = (exp(emmean)/(1+exp(emmean))),
+         asymp.LCL = (exp(asymp.LCL)/(1+exp(asymp.LCL))), 
+         asymp.UCL = (exp(asymp.UCL)/(1+exp(asymp.UCL))))
+
+means3 <- as.data.frame(emmeans::emmeans(expt1_test_results, ~ group | condition | age_year)) %>%
+  mutate(emmean = (exp(emmean)/(1+exp(emmean))),
+         asymp.LCL = (exp(asymp.LCL)/(1+exp(asymp.LCL))), 
+         asymp.UCL = (exp(asymp.UCL)/(1+exp(asymp.UCL))))
+```
+
+#### Children only 
+```{r}
+expt1_test_child_results <- geeglm(
+  response ~ condition + age_exact + group + condition*age_exact + 
+    condition*group + age_exact*group + condition*age_exact*group, 
+  data = just_data_gee, 
+  family = binomial(logit), 
+  id = id, 
+  corstr = "exchangeable")
+summary(expt1_test_child_results)
+
+expt1_test_child_anova <- anova(expt1_test_child_results)
+expt1_test_child_anova
+```
+
+##### Marginal means 
+```{r}
+expt1_child_emtrends <- as.data.frame(
+  emmeans::emtrends(expt1_test_child_results, 
+           ~ condition | group, 
+           var = "age_exact", transform = "response"))
+```
+
+
+
+### Property Inference
+Next, we examined the rate at which participants made the expected pragmatic inference.
+That is, for a given property participants said the mentioned kind had the target 
+property _and_ individuals from the unmentioned kinds did not. 
+
+#### Adults and children
+GEE looking at rate of inferences as a function of condition and age (4s, 5s, 6s and adults)
+```{r}
+expt1_inf_results <- geeglm(
+  inf ~ condition + age_year + condition*age_year, 
+  data = combined_data_inf, 
+  family = binomial(logit), 
+  id = id, 
+  corstr = "exchangeable")
+summary(expt1_inf_results)
+
+expt1_inf_anova <- anova(expt1_inf_results)
+expt1_inf_anova
+```
+
+##### Marginal means 
+As a function of condition, and of condition and age
+```{r}
+meansinf1 <- as.data.frame(emmeans::emmeans(expt1_inf_results, ~ condition)) %>%
+  mutate(emmean = (exp(emmean)/(1+exp(emmean))),
+         asymp.LCL = (exp(asymp.LCL)/(1+exp(asymp.LCL))), 
+         asymp.UCL = (exp(asymp.UCL)/(1+exp(asymp.UCL))))
+
+
+meansinf2 <- as.data.frame(emmeans::emmeans(expt1_inf_results, ~ condition | age_year)) %>%
+  mutate(emmean = (exp(emmean)/(1+exp(emmean))),
+         asymp.LCL = (exp(asymp.LCL)/(1+exp(asymp.LCL))), 
+         asymp.UCL = (exp(asymp.UCL)/(1+exp(asymp.UCL))))
+```
+
+##### Simple effects
+###### Adults
+Here, we have coded adults age as 15, although they are not 15. 
+```{r}
+fifteens <- combined_data %>% 
+  filter(age_year == 15) %>% 
+  arrange(id)
+
+fifteens_results <- geeglm(
+  response ~ condition + group + condition*group, 
+  data = fifteens, 
+  family = binomial(logit), 
+  id = id, 
+  corstr = "exchangeable")
+summary(fifteens_results)
+
+fifteens_anova <- anova(fifteens_results)
+fifteens_anova
+```
+
+```{r}
+means15 <- as.data.frame(emmeans::emmeans(fifteens_results, ~ group | condition)) %>%
+  mutate(emmean = (exp(emmean)/(1+exp(emmean))),
+         asymp.LCL = (exp(asymp.LCL)/(1+exp(asymp.LCL))), 
+         asymp.UCL = (exp(asymp.UCL)/(1+exp(asymp.UCL))))
+```
+
+###### 4-year-olds 
+```{r}
+fours <- combined_data %>% 
+  filter(age_year == 4)
+
+four_results <- geeglm(
+  response ~ condition +group +  
+    condition*group, 
+  data = fours, 
+  family = binomial(logit), 
+  id = id, 
+  corstr = "exchangeable")
+summary(four_results)
+
+fours_anova <- anova(four_results)
+fours_anova
+```
+
+```{r}
+means4 <- as.data.frame(emmeans::emmeans(four_results, ~ group | condition)) %>%
+  mutate(emmean = (exp(emmean)/(1+exp(emmean))),
+         asymp.LCL = (exp(asymp.LCL)/(1+exp(asymp.LCL))), 
+         asymp.UCL = (exp(asymp.UCL)/(1+exp(asymp.UCL))))
+means4
+```
+
+###### 5-year-olds 
+```{r}
+fives <- combined_data %>% 
+  filter(age_year == 5)
+
+fives_results <- geeglm(
+  response ~ condition +group +  
+    condition*group, 
+  data = fives, 
+  family = binomial(logit), 
+  id = id, 
+  corstr = "exchangeable")
+summary(fives_results)
+
+fives_anova <- anova(fives_results)
+fives_anova
+```
+
+```{r}
+means5 <- as.data.frame(emmeans::emmeans(fives_results, ~ group | condition)) %>%
+  mutate(emmean = (exp(emmean)/(1+exp(emmean))),
+         asymp.LCL = (exp(asymp.LCL)/(1+exp(asymp.LCL))), 
+         asymp.UCL = (exp(asymp.UCL)/(1+exp(asymp.UCL))))
+```
+
+###### 6-year-olds
+```{r}
+sixes <- combined_data %>% 
+  filter(age_year == 6)
+
+sixes_results <- geeglm(
+  response ~ condition +group +  
+    condition*group, 
+  data = sixes, 
+  family = binomial(logit), 
+  id = id, 
+  corstr = "exchangeable")
+summary(sixes_results)
+
+sixes_anova <- anova(sixes_results)
+sixes_anova
+```
+
+```{r}
+means6 <- as.data.frame(emmeans::emmeans(sixes_results, ~ group | condition)) %>%
+  mutate(emmean = (exp(emmean)/(1+exp(emmean))),
+         asymp.LCL = (exp(asymp.LCL)/(1+exp(asymp.LCL))), 
+         asymp.UCL = (exp(asymp.UCL)/(1+exp(asymp.UCL))))
+```
+
+#### Children only 
+```{r}
+full_long_gee <- full_dataset %>%
+  filter(!is.na(age)) %>%
+  filter(age_exact >= 3.9 & age_exact < 7.5) %>%
+  mutate(condition = as.factor(condition)) %>%
+  arrange(id) %>% 
+  left_join(pragmatics_avg_only, by = "id")
+
+inf_results <- geeglm(
+  inf ~ condition*age_exact, 
+  data = full_long_gee, 
+  family = binomial(logit), 
+  id = id, 
+  corstr = "exchangeable")
+
+summary(inf_results)
+
+inf_results_anova <- anova(inf_results)
+inf_results_anova
+```
+
+##### Marginal Slopes
+```{r}
+expt1_inf_child_pairs <- pairs(emmeans::emtrends(inf_results, 
+                                         ~ condition, 
+                                         var = "age_exact"))
+
+expt1_child_emtrends
+
+expt1_child_inf_emtrends <- as.data.frame(
+  emmeans::emtrends(inf_results, 
+           ~ condition, 
+           var = "age_exact", transform = "response"))
+
+meansinf1_kids <- as.data.frame(emmeans::emmeans(inf_results, ~ condition)) %>%
+  mutate(emmean = (exp(emmean)/(1+exp(emmean))),
+         asymp.LCL = (exp(asymp.LCL)/(1+exp(asymp.LCL))), 
+         asymp.UCL = (exp(asymp.UCL)/(1+exp(asymp.UCL))))
+```
+
+#### Plot 
+```{r}
+prop_extension_avg <- just_data %>% 
+  group_by(id, group) %>% 
+  mutate(extension = mean(response)) %>% 
+  select(-response) %>% 
+  filter(trial == "pizza") %>%
+  distinct() %>% 
+  filter(age_exact >= 3.5 & age_exact < 7.5)
+
+prop_extension <- just_data %>% 
+  filter(age_exact >= 3.5 & age_exact < 7.5)
+
+plot2_adult_data <- fifteens %>% 
+  group_by(id, trial) %>% 
+  arrange(group) %>%
+  mutate(group = paste0(group, row_number())) %>% 
+  mutate(group = ifelse(group == "mentioned1", "toma",
+                        ifelse(group == "unmentioned2", "gazzer", "kita"))) %>% 
+  ungroup() %>% 
+  group_by(id, condition, group) %>%
+  summarize(response_avg = mean(response),
+         age_year = 8)
+
+plot2_adult_summary <- Rmisc::summarySEwithin(data = plot2_adult_data, 
+                                       measurevar = "response",
+                                       betweenvars = c("condition",
+                                                     "age_year"),
+                                       withinvars = "group") %>% 
+  mutate(age_year = 8)
+
+plot2_data <- just_data_gee %>% 
+  filter(age_exact >= 3.5 & age_exact < 7.5)
+
+plot2 <- ggplot() +
+  facet_wrap( 
+    . ~ condition,
+    labeller = as_labeller(c(`generic` = "Generic", `specific` = "Specific"))) +
+  geom_point(
+    data = prop_extension_avg,
+    aes(x = age_exact, y = extension, color = group, shape = group)
+  ) +
+    geom_point(
+    data = plot2_adult_data,
+    aes(x = age_year, y = response_avg, color = group, shape = group),
+    position = position_jitter(width = .1, height = 0),
+    alpha = 0.5
+  ) + 
+  geom_errorbar(
+    data = plot2_adult_summary,
+    aes(ymin = response - ci,
+        ymax = response + ci,
+        x = as.numeric(as.character(age_year))),
+    width = .2
+  ) +
+  geom_point(
+    data = plot2_adult_summary,
+    aes(y = response,
+        x = as.numeric(as.character(age_year)),
+        fill = group,
+        shape = group),
+    color = "black",
+    size = 7
+  ) +
+  geom_smooth(
+    data = prop_extension,
+    aes(x = age_exact, y = response, color = group, fill = group),
+    method = "lm"
+  ) +
+  theme_classic() + 
+  scale_y_continuous(limits = c(-.02,1.04)) +
+  labs(x = "Age (in years)",
+       y = "Prop. of trials participants\nextended the target property",
+       fill = element_blank()) +
+  scale_x_continuous(breaks = c(4, 5, 6, 7, 8), 
+                     labels = c("4", "5", "6", "7", "Adults")
+  ) +
+  theme(text = element_text(size = 14),
+        panel.grid.major = element_blank(),
+        strip.background = element_blank(),
+        plot.title = element_text(size = 14,
+                                  margin = margin(t = 0, r = 0, b = 20, l = 0)),
+        axis.title.x = element_text(size = 14, 
+                                    margin = margin(t = 20, r = 0, b = 0, l = 0)),
+        axis.title.y = element_text(size = 14,
+                                    margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14),
+        strip.text = element_text(size = 14),
+        legend.title = element_text(size = 13)
+  ) +
+  scale_shape_manual(name = "Group Membership",
+                     labels = c("Unmentioned", "Unmentioned", "Mentioned"),
+                     values = c(21, 22, 23)
+  ) +
+  scale_color_manual(name = "Group Membership",
+                     labels = c("Unmentioned", "Unmentioned", "Mentioned"),
+                     values = c("#58b947", "#E44448","#d9be00")
+  ) +
+  scale_fill_manual(name = "Group Membership",
+                     labels = c("Unmentioned", "Unmentioned", "Mentioned"),
+                     values = c("#58b947", "#E44448","#d9be00")
+  ) +
+  guides(fill = guide_legend(title.position = "top",
+                             title.hjust = 0.5),
+         shape = guide_legend(title.position = "top",
+                              title.hjust = 0.5),
+         # color = guide_legend(override.aes = list(fill = c("#d9be00", "#58b947", "#DC1D21")),
+                              title.position = "top",
+                              title.hjust = 0.5) 
+```
+
+### Pragmatic
+
+GEE examining rate of making pragmatic inferences in context-dependent inference task first developed by Stiler, Goodman, & Frank (2015).
+```{r}
+pragmatics_results <- geeglm(
+  correct ~ age_exact*condition, 
+  data = pragmatics_only, 
+  family = binomial(logit), 
+  id = id, 
+  corstr = "exchangeable")
+summary(pragmatics_only_results)
+
+pragmatics_only_anova <- anova(pragmatics_only_results)
+pragmatics_only_anova
+```
+
+#### Plot 
+```{r}
+plot_prag <- ggplot() + 
+  geom_point(
+    data = pragmatics_avg,
+    aes(x = prag_avg, y = inf_avg),
+    position = position_jitter(width = 0.05, height = 0.05),
+    alpha = 0.5
+  ) +
+  geom_smooth(
+    data = pragmatics_avg,
+    aes(x = prag_avg, y = inf_avg),
+    method = "lm",
+  ) +
+  theme_classic() +
+  labs(x = "Age (in years)",
+       y = "Prop. of trials participants\nmade expected inference",
+       fill = element_blank()) +
+  scale_x_continuous(breaks = c(4, 5, 6, 7, 8), 
+                     labels = c("4", "5", "6", "7", "Adults")
+  ) +
+  theme(text = element_text(size = 14),
+        panel.grid.major = element_blank(),
+        strip.background = element_blank(),
+        plot.title = element_text(size = 14,
+                                  margin = margin(t = 0, r = 0, b = 20, l = 0)),
+        axis.title.x = element_text(size = 14, 
+                                    margin = margin(t = 20, r = 0, b = 0, l = 0)),
+        axis.title.y = element_text(size = 14,
+                                    margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14),
+        strip.text = element_text(size = 14),
+        legend.title = element_text(size = 13)
+  ) +
+  scale_shape_manual(name = "Condition",
+                     labels = c("Generic", "Specific"),
+                     values = c(21, 22)
+  ) +
+  scale_color_manual(name = "Condition",
+                     labels = c("Generic", "Specific"),
+                     values = c( "#e39b2b", "#619f97")
+  ) +
+  scale_fill_manual(name = "Condition",
+                    labels = c("Generic", "Specific"),
+                    values = c("#e39b2b", "#619f97")
+  ) +
+  guides(fill = guide_legend(title.position = "top",
+                             title.hjust = 0.5),
+         shape = guide_legend(title.position = "top",
+                              title.hjust = 0.5),
+         color = guide_legend(override.aes = list(fill = c("#e39b2b", "#619f97")),
+                              title.position = "top",
+                              title.hjust = 0.5)
+  ) 
+
+
+```
+
+### Category knowledge check accuracy
+```{r}
+child_checks <- dataset_wide %>% 
+  select(id, starts_with("check")) %>% 
+  pivot_longer(starts_with("check"), names_to = "check", values_to = "response") %>% 
+  mutate(response = ifelse(response == "correct", 1, 0)) %>% 
+  right_join(full_long_gee, by = "id") %>% 
+  group_by(id) %>% 
+  summarize(means = mean(response))
+
+mean(child_checks$response)
+
+x <- rapply(child_checks, as.character, how = "replace")
+x[1,7]
+```
+
+
+Adult and kid data
+```{r}
+kid_data <- just_data_gee %>% 
+  select(id, condition, trial, group, response, age_exact, age_year) %>%
+  mutate(id = as.character(id))
+
+adult_data <- data_adult %>% 
+  select(ResponseId, Condition, trial, group, response) %>% 
+  rename(condition = Condition) %>%
+  mutate(age_exact = 15, age_year = 15, condition = tolower(condition)) %>%
+  group_by(ResponseId) %>% 
+  mutate(id = as.character(cur_group_id() + 200)) %>% 
+  ungroup() %>%
+  select(id, condition, trial, group, response, age_exact, age_year)
+
+combined_data <- bind_rows(kid_data, adult_data) %>%
+  mutate(age_year = ifelse(age_year == 3, 4, 
+                           ifelse(age_year == 7, 6, age_year))) %>%
+  mutate(age_year = as.factor(age_year),
+         condition = as.factor(condition),
+         group = as.factor(group))
+```
+
+
+
+inf combined data
+```{r}
+combined_data_inf <- combined_data %>% 
+  ungroup() %>%
+  group_by(id, trial) %>% 
+  arrange(group) %>%
+  mutate(group = paste0(group, row_number())) %>% 
+  pivot_wider(names_from = "group", values_from = response) %>%
+  mutate(inf = ifelse(mentioned1 == 1 & unmentioned2 == 0 & unmentioned3 == 0, 1, 0)) %>% 
+  ungroup() %>% 
+  arrange(id) 
+
+combined_data_inf$age_year <- relevel(combined_data_inf$age_year, ref = "15")
+```
+
+
+
+
+
+
+
+```{r}
+combined_data %>% group_by(age_year, condition, group) %>% summarize(resp = mean(response))
+
+combined_data %>% group_by(condition) %>% summarize(resp = mean(response))
+```
+
+
+```{r}
+plot1_data <- full_long %>%
+  filter(age_exact >= 3.75 & age_exact < 7.5)
+
+plot1_adult_summary <- Rmisc::summarySE(data = fifteens_inf, 
+                                       measurevar = "inf",
+                                       groupvars = c("condition", 
+                                                     "age_year")) %>% 
+  mutate(age_year = 8)
+
+
+plot1_adult_infavg <- fifteens_inf %>% 
+  group_by(id) %>% 
+  summarize(inf_mean = mean(inf)) %>% 
+  left_join(fifteens_inf, by = "id") %>% 
+  distinct(id, .keep_all = TRUE) %>% 
+  mutate(age_exact = 8,
+         id = as.numeric(id),
+         age_year = as.numeric(8))
+
+plot1_combined <- bind_rows(plot1_data, plot1_adult_infavg) %>% 
+  mutate(age_group = ifelse(age_year == 8, "adult", "kid"))
+
+plot1 <- ggplot() +
+  geom_point(
+    data = plot1_data,
+    aes(x = age_exact, y = inf_mean, color = condition, shape = condition),
+    position = position_jitter(width = 0, height = 0.02),
+    alpha = 0.5
+  ) +
+  geom_smooth(
+    data = plot1_data,
+    aes(x = age_exact, y = inf_mean, color = condition, fill = condition),
+    method = "lm",
+  ) +
+  geom_point(
+    data = plot1_adult_infavg,
+    aes(x = age_exact, y = inf_mean, color = condition, shape = condition),
+    position = position_jitter(width = .1, height = 0),
+    alpha = 0.5
+  ) + 
+  geom_errorbar(
+    data = plot1_adult_summary,
+    aes(ymin = inf - ci,
+        ymax = inf + ci,
+        x = as.numeric(as.character(age_year))),
+    width = .2
+  ) +
+  geom_point(
+    data = plot1_adult_summary,
+    aes(y = inf,
+        x = as.numeric(as.character(age_year)),
+        fill = condition,
+        shape = condition),
+    color = "black",
+    size = 7
+  ) +
+  theme_classic() +
+  labs(x = "Age (in years)",
+       y = "Prop. of trials participants\nmade expected inference",
+       fill = element_blank()) +
+  scale_x_continuous(breaks = c(4, 5, 6, 7, 8), 
+                     labels = c("4", "5", "6", "7", "Adults")
+  ) +
+  theme(text = element_text(size = 14),
+        panel.grid.major = element_blank(),
+        strip.background = element_blank(),
+        plot.title = element_text(size = 14,
+                                  margin = margin(t = 0, r = 0, b = 20, l = 0)),
+        axis.title.x = element_text(size = 14, 
+                                    margin = margin(t = 20, r = 0, b = 0, l = 0)),
+        axis.title.y = element_text(size = 14,
+                                    margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14),
+        strip.text = element_text(size = 14),
+        legend.title = element_text(size = 13)
+  ) +
+  scale_shape_manual(name = "Condition",
+                     labels = c("Generic", "Specific"),
+                     values = c(21, 22)
+  ) +
+  scale_color_manual(name = "Condition",
+                     labels = c("Generic", "Specific"),
+                     values = c( "#e39b2b", "#619f97")
+  ) +
+  scale_fill_manual(name = "Condition",
+                    labels = c("Generic", "Specific"),
+                    values = c("#e39b2b", "#619f97")
+  ) +
+  guides(fill = guide_legend(title.position = "top",
+                             title.hjust = 0.5),
+         shape = guide_legend(title.position = "top",
+                              title.hjust = 0.5),
+         color = guide_legend(override.aes = list(fill = c("#e39b2b", "#619f97")),
+                              title.position = "top",
+                              title.hjust = 0.5)
+  ) 
+
+plot1 
+
+```
+
+```{r}
+demo %>% 
+  right_join(id, by = "sid") %>%
+  group_by(age_year) %>% 
+  summarize(amount = length(age_year))
+```
+
+
+```{r}
+full_long_gee %>% 
+ group_by(age_year) %>%
+ summarize(total = n()/4,
+           means = mean(age_exact))
+
+full_long_gee %>% 
+  group_by(gender) %>%
+  summarize(total = n()/4)
+```
+
+
+Creating age-matched sample from Pidi
+```{r}
+pidi_three_ages <- full_long_gee %>% 
+  select(sid, condition, age_exact) %>% 
+  unique() %>% 
+  mutate(study = "three") %>% 
+  mutate(sid = as.character(sid))
+
+pidi1_ages <- pidi1_data %>%
+  select(id, condition, age_exact) %>% 
+  rename(sid = id) %>% 
+  unique() %>% 
+  mutate(study = "one") %>% 
+  filter(age_exact < 8) 
+
+pidi_both <- bind_rows(pidi_three_ages, pidi1_ages) %>% 
+  mutate(study = as.factor(study),
+         condition = as.factor(condition)) %>% 
+  select(study, condition, age_exact, sid)
+
+m <- e1071::matchControls(study ~ condition + age_exact, data = pidi_both,
+                   caselabel = "three", contlabel = "one")
+
+pidi_both <- left_join(pidi_both %>% mutate( rownumber = rownames(.) ),
+          as.data.frame(m$factor) %>% mutate( rownumber = rownames(.) ), 
+          by = "rownumber" )
+
+pidi_both <- pidi_both %>% 
+  rename(keepers = "m$factor") %>% 
+  filter(!is.na(keepers))
+
+pidi_both %>% 
+  group_by(study, condition) %>% 
+  summarize(means = mean(age_exact, na.rm = TRUE)) 
+
+sids_matched <- pidi_both %>% 
+  select(sid) %>% 
+  mutate(sid = as.character(sid))
+```
+
+
+```{r}
+# creating dataframe with just the test trials, removing some unneeded columns
+expt1_test <- pidi1_data %>%
+  filter(trial_type == "test") %>%
+  select(-trial_type, -trial)
+
+expt1_test$age_categorical <- as.factor(as.character(expt1_test$age_categorical))
+
+# Computing average response across stimulus type (whether it was previously mentioned
+# or unmentioned)
+# We will use this for graphing later on
+expt1_test <- expt1_test %>%
+  group_by(id, group) %>%
+  mutate(response_avg = mean(response))
+
+expt1_test$new_id <- cumsum(!duplicated(expt1_test$id))
+
+expt1_inference_trial_order <- expt1_test %>% 
+  ungroup() %>%
+  arrange(trial_order) %>% 
+  distinct(id, property, .keep_all = TRUE) %>% 
+  select(id, property, trial_order) %>% 
+  mutate(trial_order = ifelse(trial_order %% 2 == 0, trial_order - 1,
+                              trial_order))
+
+# Creating another data frame where we compare trial by trial if participants
+# responded "yes" for mentioned group and "no" for previously unmentioned group
+expt1_inference <- expt1_test %>%
+  select(-trial_order, -response_avg, -response_as_string) %>%
+  tidyr::spread(value = response, key = group) %>% 
+  dplyr::mutate(inf = ifelse(mentioned == 1 & unmentioned == 0, 1, 0)) %>%
+  dplyr::group_by(id) %>% 
+  dplyr::mutate(inf_avg = mean(inf)) %>% 
+  full_join(expt1_inference_trial_order)
+
+expt1_inference <- expt1_inference %>% 
+  select(id, condition, property, age_exact, inf) %>% 
+  rename(sid = id, trial = property) %>% 
+  mutate(study = "one") %>%
+  filter(age_exact < 8) 
+```
+
+```{r}
+pidi3_inference <- full_long_gee %>% 
+  select(sid, condition, trial, age_exact, inf) %>% 
+  mutate(study = "three",
+         sid = as.character(sid))
+```
+
+```{r}
+both <- bind_rows(expt1_inference, pidi3_inference)
+
+both_data <- left_join(sids_matched, both)
+```
+
+```{r}
+both_data %>% 
+  group_by(study, condition) %>% 
+  summarize(means = mean(age_exact, na.rm = TRUE),
+            sds = sd(age_exact),
+            number = length(age_exact)) 
+```
+
+```{r}
+
+both_data <- both_data %>% 
+  mutate(study = as.factor(study),
+         condition = as.factor(condition)) %>% 
+  filter(!is.na(age_exact))
+
+both_data1 <- both_data %>% 
+  distinct(sid, condition, trial, .keep_all =TRUE) %>% 
+  mutate(id = gsub("K","", sid))
+
+inf_results_both <- geeglm(
+  inf ~ condition*age_exact*study, 
+  data = both_data1, 
+  family = binomial(logit), 
+  id = id, 
+  corstr = "exchangeable")
+
+summary(inf_results_both)
+
+inf_results_both_anova <- anova(inf_results_both)
+inf_results_both_anova
+
+meansinf1_both <- as.data.frame(emmeans::emmeans(inf_results_both, ~ condition | study)) %>%
+  mutate(emmean = (exp(emmean)/(1+exp(emmean))),
+         asymp.LCL = (exp(asymp.LCL)/(1+exp(asymp.LCL))), 
+         asymp.UCL = (exp(asymp.UCL)/(1+exp(asymp.UCL))))
+
+both_data1_gen <- both_data1 %>% 
+  filter(condition == "specific")
+
+inf_results_both_gen <- geeglm(
+  inf ~ age_exact*study, 
+  data = both_data1_gen, 
+  family = binomial(logit), 
+  id = id, 
+  corstr = "exchangeable")
+
+summary(inf_results_both_gen)
+
+inf_results_both_gen_anova <- anova(inf_results_both_gen)
+inf_results_both_gen_anova
+
+```
+
+```{r}
+plot4_data <- both_data1 %>% 
+  group_by(id, age_exact, study) %>% 
+  summarize(mean_inf = mean(inf))
+
+plot4 <- ggplot(data = both_data1) +
+  facet_wrap( 
+    . ~ condition,
+    labeller = as_labeller(c(`generic` = "Generic", `specific` = "Specific"))) +
+  geom_point(
+    data = plot4_data,
+    aes(x = age_exact, y = mean_inf, color = study, shape = study),
+    position = position_jitter(width = 0, height = 0.02),
+    alpha = 0.5
+  ) +
+  geom_smooth(aes(x = age_exact, y = inf, fill = study, color = study),
+              method = "lm",
+              fullrange = TRUE) +
+  theme_classic() + 
+  labs(
+    x = "Age (in years)",
+    y = "Proportion of trials participants made pragmatic inference"
+  ) +
+  coord_cartesian(ylim=c(0,1)) +
+  scale_y_continuous(limits = c(-0.2,1.1)) + 
+  labs(x = "Age (in years)",
+       y = "Prop. of trials participants\nmade expected inference",
+       fill = element_blank()) +
+  scale_x_continuous(breaks = c(4, 5, 6, 7, 8), 
+                     labels = c("4", "5", "6", "7", "Adults")
+  ) +
+  theme(text = element_text(size = 14),
+        panel.grid.major = element_blank(),
+        strip.background = element_blank(),
+        plot.title = element_text(size = 14,
+                                  margin = margin(t = 0, r = 0, b = 20, l = 0)),
+        axis.title.x = element_text(size = 14, 
+                                    margin = margin(t = 20, r = 0, b = 0, l = 0)),
+        axis.title.y = element_text(size = 14,
+                                    margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14),
+        strip.text = element_text(size = 14),
+        legend.title = element_text(size = 13)
+  ) +
+  scale_shape_manual(name = "Number of Kinds\nin Social Contrast",
+                     labels = c("Two", "Three"),
+                     values = c(21, 22)
+  ) +
+  scale_color_manual(name = "Number of Kinds\nin Social Contrast",
+                     labels = c("Two", "Three"),
+                     values = c( "#FFB465", "#A657B4")
+  ) +
+  scale_fill_manual(name = "Number of Kinds\nin Social Contrast",
+                     labels = c("Two", "Three"),
+                    values = c("#FFB465", "#A657B4")
+  ) +
+  guides(fill = guide_legend(title.position = "top",
+                             title.hjust = 0.5),
+         shape = guide_legend(title.position = "top",
+                              title.hjust = 0.5),
+         color = guide_legend(override.aes = list(fill = c("#FFB465", "#A657B4")),
+                              title.position = "top",
+                              title.hjust = 0.5)
+  ) 
+```
+
+Extension
+
+```{r}
+pidi1_test <- expt1_test %>% 
+  select(id, condition, property, age_exact, group, response) %>% 
+  rename(sid = id, trial = property) %>% 
+  mutate(study = "one")
+
+pidi3_test <- full_long_gee %>% 
+  select(sid, condition, trial, age_exact, gazzer, toma, kita) %>% 
+  pivot_longer(cols = c("gazzer", "toma", "kita"), names_to = "group", values_to = "response") %>% 
+  mutate(group = ifelse(group == "toma", "mentioned", "unmentioned")) %>%
+  mutate(study = "three")
+```
+
+```{r}
+both_test <- bind_rows(pidi1_test, pidi3_test)
+
+both_test_data <- left_join(sids_matched, both_test)
+```
+
+```{r}
+
+both_test_data <- both_test_data %>% 
+  mutate(study = as.factor(study),
+         condition = as.factor(condition),
+         group = as.factor(group)) %>% 
+  filter(!is.na(age_exact))
+
+test_results_both <- geeglm(
+  response ~ condition*age_exact*study*group, 
+  data = both_test_data, 
+  family = binomial(logit), 
+  id = sid, 
+  corstr = "exchangeable")
+
+summary(test_results_both)
+
+test_results_both_anova <- anova(test_results_both)
+test_results_both_anova
+```
+
+
+```{r}
+ggplot(data = both_test_data) +
+  facet_wrap( condition ~ group) +
+  geom_smooth(aes(x = age_exact, y = response, fill = study, color = study),
+              method = "lm",
+              fullrange = TRUE) +
+  theme_classic() + 
+  labs(
+    x = "Age (in years)",
+    y = "Proportion of trials participants made pragmatic inference"
+  ) +
+  coord_cartesian(ylim=c(0,1)) +
+  scale_y_continuous(limits = c(-0.2,1.1))
+```
+
+
+```{r}
+
+adult_combined_avg <- adult_combined %>% 
+  ungroup() %>%
+  group_by(labeled, Condition, group) %>% 
+  summarize(response_avg = mean(response))
+
+extension_summary <- Rmisc::summarySEwithin(adult_combined, "response", betweenvars = c("Condition", "labeled"), withinvars = "group") %>% 
+  arrange(labeled)
+
+adult_combined_ind <- adult_combined %>% 
+  distinct(mTurk, group, .keep_all = TRUE) %>% 
+  arrange(labeled)
+
+extension3_plot <- ggplot(data = extension_summary) +
+  facet_wrap( . ~ labeled) +
+  geom_point(
+    data = adult_combined_ind,
+    aes(x = Condition,
+        y = response_avg,
+        fill = group,
+        color = group),
+    position = position_jitter(w=0.1, h=0),
+    alpha = .2) +
+  geom_errorbar(
+    aes(
+      x = Condition,
+      ymin = response - ci,
+      ymax = response + ci,
+      color = group
+    ),
+    width = 0.1
+  ) +
+  geom_point(
+    aes(x = Condition,
+        y = response,
+        fill = group,
+        color = group),
+    size = 5,
+    shape = 21) +
+  theme_classic() + 
+  labs(
+    x = "Condition",
+    y = "Proportion of trials participants extended target property"
+  ) +
+  coord_cartesian(ylim=c(0,1)) +
+  scale_y_continuous(limits = c(0,1.1))
+```
+
+
+```{r}
+made_inf_adult_combined_avg <- made_inf_adult_combined %>% 
+  ungroup() %>%
+  group_by(labeled, Condition) %>% 
+  summarize(inf_avg = mean(inf))
+
+made_inf_summary <- Rmisc::summarySE(made_inf_adult_combined, "inf", groupvars = c("Condition", "labeled"))
+
+made_inf_adult_combined_ind <- made_inf_adult_combined %>% 
+  group_by(mTurk) %>%
+  mutate(inf_avg = mean(inf)) %>%
+  distinct(mTurk, .keep_all = TRUE)
+
+inf3_plot <- ggplot(data = made_inf_summary) +
+  facet_wrap( . ~ labeled) +
+  geom_point(
+    data = made_inf_adult_combined_ind,
+    aes(x = Condition,
+        y = inf_avg,
+        fill = labeled,
+        color = labeled),
+    position = position_jitter(w=0.1, h=0),
+    alpha = .2) +
+  geom_errorbar(
+    aes(
+      x = Condition,
+      ymin = inf - ci,
+      ymax = inf + ci,
+      color = labeled
+    ),
+    width = 0.1
+  ) +
+  geom_point(
+    aes(x = Condition,
+        y = inf,
+        fill = labeled,
+        color = labeled),
+    size = 5,
+    shape = 21) +
+  theme_classic() + 
+  labs(
+    x = "Category",
+    y = "Proportion of trials participants made the pragmatic inference"
+  ) +
+  coord_cartesian(ylim=c(0,1)) +
+  scale_y_continuous(limits = c(0,1.1))
+```
+
+
+
+
+
+```{r}
+data_label <- data_labeled %>% 
+  select(mTurk, starts_with("pizza"), starts_with("piano"), starts_with("tree"), starts_with("paint"), Condition) %>% 
+  filter(Condition != "{\"ImportId\":\"Condition\"}") %>% 
+  pivot_longer(cols = c(starts_with("p"), starts_with("tree")),
+               names_to = "trial",
+               values_to = "response") %>% 
+  separate(trial, into = c("trial", "group"), sep = "_") %>% 
+  filter(response == "On") %>% 
+  mutate(response = ifelse(endsWith(group, "yes"), 1, 0)) %>% 
+  mutate(group = ifelse(startsWith(group, "u"), "unmentioned", "mentioned"),
+         labeled = "all")
+```
+
+```{r}
+data_onelabel <- data_onelabeled %>% 
+  select(mTurk, starts_with("pizza"), starts_with("piano"), starts_with("tree"), starts_with("paint"), Condition) %>% 
+  filter(Condition != "{\"ImportId\":\"Condition\"}") %>% 
+  pivot_longer(cols = c(starts_with("p"), starts_with("tree")),
+               names_to = "trial",
+               values_to = "response") %>% 
+  separate(trial, into = c("trial", "group"), sep = "_") %>% 
+  filter(response == "On") %>% 
+  mutate(response = ifelse(endsWith(group, "yes"), 1, 0)) %>% 
+  mutate(group = ifelse(startsWith(group, "u"), "unmentioned", "mentioned"),
+         labeled = "one")
+```
+
+```{r}
+data_onegroup <- pidi3_adult_onegroup %>% 
+  select(mTurk, starts_with("pizza"), starts_with("piano"), starts_with("tree"), starts_with("paint"), Condition) %>% 
+  filter(Condition != "{\"ImportId\":\"Condition\"}") %>% 
+  pivot_longer(cols = c(starts_with("p"), starts_with("tree")),
+               names_to = "trial",
+               values_to = "response") %>% 
+  separate(trial, into = c("trial", "group"), sep = "_") %>% 
+  filter(response == "On") %>% 
+  mutate(response = ifelse(endsWith(group, "yes"), 1, 0)) %>% 
+  mutate(group = ifelse(startsWith(group, "u"), "unmentioned", "mentioned"),
+         labeled = "one_group")
+```
+
+```{r}
+data_combined <- bind_rows(data_label, data_onelabel) %>% 
+  bind_rows(data_onegroup)
+```
+
+```{r}
+data_combined <- data_combined %>% 
+  mutate(labeled = as.factor(labeled),
+         Condition = as.factor(Condition),
+         group = as.factor(group)) 
+
+test_results_both <- geeglm(
+  response ~ Condition*group*labeled, 
+  data = data_combined, 
+  family = binomial(logit), 
+  id = mTurk, 
+  corstr = "exchangeable")
+
+summary(test_results_both)
+
+test_results_both_anova <- anova(test_results_both)
+test_results_both_anova
+```
+
+```{r}
+data_onegroup %>% 
+  group_by(Condition, group) %>% 
+  summarize(means = mean(response))
+```
+
+
+
+### Analyzing adult data
+
+### Original study
+
+
+Inference
+```{r}
+made_inf <- data_adult %>% 
+  ungroup() %>%
+  group_by(mTurk, trial) %>%
+  arrange(group) %>%
+  mutate(group = str_c(group, row_number())) %>%
+  ungroup() %>%
+  select(-response_avg) %>%
+  pivot_wider(names_from = group, values_from = response) %>%
+  mutate(inf = ifelse(mentioned1 == 1 & unmentioned2 == 0 & unmentioned3 == 0, 1, 0))
+
+made_inf %>%
+  group_by(Condition) %>%
+  summarize(m_inf = mean(inf))
+```
+
+
+
+## Study 2
+### Property Extension
+```{r}
+test_results_adult4 <- geeglm(
+  response ~ condition*group, 
+  data = adults_group4, 
+  family = binomial(logit), 
+  id = id, 
+  corstr = "exchangeable")
+
+summary(test_results_adult4)
+
+test_results_adult4_anova <- anova(test_results_adult4)
+test_results_adult4_anova
+```
+
+```{r}
+means_ext4 <- as.data.frame(emmeans::emmeans(test_results_adult4, ~ condition | group)) %>%
+  mutate(emmean = (exp(emmean)/(1+exp(emmean))),
+         asymp.LCL = (exp(asymp.LCL)/(1+exp(asymp.LCL))), 
+         asymp.UCL = (exp(asymp.UCL)/(1+exp(asymp.UCL))))
+
+means_ext4
+
+```
+
+### Property Inference
+```{r}
+test_results_adult4_inf <- geeglm(
+  inf ~ condition, 
+  data = adults_group4, 
+  family = binomial(logit), 
+  id = id, 
+  corstr = "exchangeable")
+
+summary(test_results_adult4_inf)
+
+test_results_adult4_inf_anova <- anova(test_results_adult4_inf)
+test_results_adult4_inf_anova
+
+Rmisc::summarySE(adults_group4_inf, measurevar = "inf", groupvars = "condition")
+```
+
+#### Comparison to two and three groups
+```{r}
+adults_group2_inf <- pidi1_data %>% 
+  filter(age_categorical == 8) %>% 
+  filter(!is.na(group)) %>% 
+  select(id, condition, group, property, response) %>% 
+  mutate(mturk = id) %>% 
+  group_by(mturk) %>% 
+  mutate(id = cur_group_id() + 700) %>% 
+  rename(trial = property) %>% 
+  pivot_wider(names_from = "group", values_from = "response") %>% 
+  mutate(inf = ifelse(mentioned == 1 & unmentioned == 0, 1, 0)) %>% 
+  ungroup() %>%
+  select(id, condition, trial, inf) %>%
+  mutate(group_num = "two")
+
+adults_group4_inf <- adults_group4 %>% 
+  select(id, condition, trial, inf) %>%
+  distinct(id, trial, .keep_all = TRUE) %>%
+  mutate(group_num = "four")
+
+adults_group3_inf <- made_inf %>% 
+  rename(condition = Condition) %>% 
+  group_by(ResponseId) %>% 
+  mutate(id = cur_group_id() + 900,
+         condition = tolower(condition)) %>% 
+  ungroup() %>%
+  select(id, condition, trial, inf) %>%
+  mutate(group_num = "three")
+
+adults_group234_inf <- adults_group4_inf %>% 
+  bind_rows(adults_group3_inf) %>% 
+  bind_rows(adults_group2_inf) %>% 
+  arrange(group_num) %>%
+  mutate(condition = as.factor(condition),
+         group_num = as.factor(group_num)) 
+
+adults_group234_inf$group_num <- factor(adults_group234_inf$group_num, levels = c("two", "three", "four"))
+```
+
+```{r}
+test_results_adult234_inf <- geeglm(
+  inf ~ condition + group_num + condition*group_num, 
+  data = adults_group234_inf, 
+  family = binomial(logit), 
+  id = id, 
+  corstr = "exchangeable")
+
+summary(test_results_adult234_inf)
+
+test_results_adult234_inf_anova <- anova(test_results_adult234_inf)
+test_results_adult234_inf_anova
+
+Rmisc::summarySE(adults_group4_inf, measurevar = "inf", groupvars = "condition")
+```
+
+### Plot 
+```{r}
+plot234_adult_summary <- Rmisc::summarySE(data = adults_group234_inf, 
+                                       measurevar = "inf",
+                                       groupvars = c("condition", "group_num")) 
+
+
+plot234_adult_infavg <- adults_group234_inf %>% 
+  group_by(id, condition, group_num) %>% 
+  summarize(inf_mean = mean(inf)) 
+
+
+plot234 <- ggplot() + 
+  geom_point(
+    data = plot234_adult_infavg,
+    aes(x = group_num, y = inf_mean, color = condition, shape = condition),
+    position = position_jitter(width = 0.2, height = 0),
+    alpha = 0.5
+  ) +
+  geom_errorbar(
+    data = plot234_adult_summary,
+    aes(ymin = inf - ci,
+        ymax = inf + ci,
+        x = group_num,
+        color = condition),
+    width = .1
+  ) +
+  geom_point(
+    data = plot234_adult_summary,
+    aes(y = inf,
+        x = group_num,
+        fill = condition,
+        shape = condition),
+    color = "black",
+    size = 7
+  ) +
+  theme_classic() +
+  labs(x = "Number of Novel Kinds in Social Contrast",
+       y = "Prop. of trials participants\nmade expected inference",
+       fill = element_blank()) +
+  theme(text = element_text(size = 14),
+        panel.grid.major = element_blank(),
+        strip.background = element_blank(),
+        plot.title = element_text(size = 14,
+                                  margin = margin(t = 0, r = 0, b = 20, l = 0)),
+        axis.title.x = element_text(size = 14, 
+                                    margin = margin(t = 20, r = 0, b = 0, l = 0)),
+        axis.title.y = element_text(size = 14,
+                                    margin = margin(t = 0, r = 20, b = 0, l = 0)),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14),
+        strip.text = element_text(size = 14),
+        legend.title = element_text(size = 13)
+  ) +
+  scale_x_discrete(labels = c("Two", "Three", "Four")) +
+  scale_shape_manual(name = "Condition",
+                     labels = c("Generic", "Specific"),
+                     values = c(21, 22)
+  ) +
+  scale_color_manual(name = "Condition",
+                     labels = c("Generic", "Specific"),
+                     values = c( "#e39b2b", "#619f97")
+  ) +
+  scale_fill_manual(name = "Condition",
+                    labels = c("Generic", "Specific"),
+                    values = c("#e39b2b", "#619f97")
+  ) +
+  guides(fill = guide_legend(title.position = "top",
+                             title.hjust = 0.5),
+         shape = guide_legend(title.position = "top",
+                              title.hjust = 0.5),
+         color = guide_legend(override.aes = list(fill = c("#e39b2b", "#619f97")),
+                              title.position = "top",
+                              title.hjust = 0.5)
+  ) 
+
+plot234 
+```
+
+## Study 3
+
+### Property extension
+
+#### Combined data 
+```{r}
+test_results_adult_combined <- geeglm(
+  response ~ Condition*group*labeled, 
+  data = adult_combined, 
+  family = binomial(logit), 
+  id = mTurk, 
+  corstr = "exchangeable")
+
+summary(test_results_adult_combined)
+
+test_results_adult_combined_anova <- anova(test_results_adult_combined)
+test_results_adult_combined_anova
+```
+
+#### One label
+```{r}
+test_results_adult_onelabel <- geeglm(
+  response ~ Condition*group, 
+  data = data_adult_onelabel, 
+  family = binomial(logit), 
+  id = mTurk, 
+  corstr = "exchangeable")
+
+summary(test_results_adult_onelabel)
+
+test_results_adult_onelabel_anova <- anova(test_results_adult_onelabel)
+test_results_adult_onelabel_anova
+```
+
+#### One Group
+```{r}
+test_results_adult_onegroup <- geeglm(
+  response ~ Condition*group, 
+  data = data_adult_onegroup, 
+  family = binomial(logit), 
+  id = mTurk, 
+  corstr = "exchangeable")
+
+summary(test_results_adult_onegroup)
+
+test_results_adult_onegroup_anova <- anova(test_results_adult_onegroup)
+test_results_adult_onegroup_anova
+```
+
+### Property inference
+
+#### Combined data
+```{r}
+test_results_adult_inf_combined <- geeglm(
+  inf ~ Condition*labeled, 
+  data = made_inf_adult_combined, 
+  family = binomial(logit), 
+  id = mTurk, 
+  corstr = "exchangeable")
+
+summary(test_results_adult_inf_combined)
+
+
+test_results_adult_inf_combined_anova <- anova(test_results_adult_inf_combined)
+test_results_adult_inf_combined_anova
+```
+
+##### Marginal means 
+```{r}
+means_adultcombined <- pairs(emmeans::emmeans(test_results_adult_inf_combined, ~ labeled | Condition)) %>%
+  mutate(emmean = (exp(emmean)/(1+exp(emmean))),
+         asymp.LCL = (exp(asymp.LCL)/(1+exp(asymp.LCL))), 
+         asymp.UCL = (exp(asymp.UCL)/(1+exp(asymp.UCL))))
+
+meansinf1_combined <- as.data.frame(emmeans::emmeans(test_results_adult_inf_combined, ~ labeled | Condition)) %>%
+  mutate(emmean = (exp(emmean)/(1+exp(emmean))),
+         asymp.LCL = (exp(asymp.LCL)/(1+exp(asymp.LCL))), 
+         asymp.UCL = (exp(asymp.UCL)/(1+exp(asymp.UCL))))
+```
+
+
+#### One label
+```{r}
+test_results_adult_inf_onelabel <- geeglm(
+  inf ~ Condition, 
+  data = made_inf_onelabel, 
+  family = binomial(logit), 
+  id = mTurk, 
+  corstr = "exchangeable")
+
+summary(test_results_adult_inf_onelabel)
+
+test_results_adult_inf_onelabel_anova <- anova(test_results_adult_inf_onelabel)
+test_results_adult_inf_onelabel_anova
+```
+
+#### One group
+```{r}
+test_results_adult_inf_onegroup <- geeglm(
+  inf ~ Condition, 
+  data = made_inf_onegroup, 
+  family = binomial(logit), 
+  id = mTurk, 
+  corstr = "exchangeable")
+
+summary(test_results_adult_inf_onegroup)
+
+test_results_adult_inf_onegroup_anova <- anova(test_results_adult_inf_onegroup)
+test_results_adult_inf_onegroup_anova
+```
+
+
+
+
+
